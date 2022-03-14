@@ -14,6 +14,8 @@ namespace EmailSender
             services.AddSingleton(resolver =>
                 resolver.GetRequiredService<IOptions<EmailSenderConfiguration>>().Value);
 
+            FileReader.BootstrapperExtension.RegisterFileReader(services, configuration);
+
             services.AddSingleton<ISender, Sender>();
         }
     }

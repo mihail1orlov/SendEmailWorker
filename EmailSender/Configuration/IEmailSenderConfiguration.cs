@@ -3,7 +3,7 @@
     public interface IEmailSenderConfiguration
     {
         string AddressFrom { get; set; }
-        string AddressTo { get; set; }
+        string AddressesToPath { get; set; }
         string AddressFromDisplayName { get; set; }
         string Subject { get; set; }
         string Body { get; set; }
@@ -13,5 +13,8 @@
         bool EnableSsl { get; set; }
         bool UseDefaultCredentials { get; set; }
         int Port { get; set; }
+        string AttachmentFileName { get; set; }
+        int MinDelay { get; set; }
+        int MaxDelay { get; set; }
     }
 }

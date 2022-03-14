@@ -1,4 +1,7 @@
 ﻿using EmailSender.Configuration;
+using FileReader;
+using Microsoft.Extensions.Logging;
+using System;
 using System.Net;
 using System.Net.Mail;
 using System.Threading;
@@ -7,30 +10,57 @@ namespace EmailSender
 {
     public class Sender : ISender
     {
+        private readonly ILogger<Sender> _logger;
         private readonly IEmailSenderConfiguration _emailSenderConfiguration;
+        private readonly IFileReader _fileReader;
 
-        public Sender(EmailSenderConfiguration emailSenderConfiguration)
+        public Sender(ILogger<Sender> logger,
+            EmailSenderConfiguration emailSenderConfiguration,
+            IFileReader fileReader)
         {
+            _logger = logger;
             _emailSenderConfiguration = emailSenderConfiguration;
+            _fileReader = fileReader;
         }
 
         public void Send(CancellationToken cancellationToken)
         {
-            MailMessage msg = new MailMessage();
+            foreach (var address in _fileReader.GetLines(_emailSenderConfiguration.AddressesToPath))
+            {
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    Send(address);
+                    _logger.LogInformation($"Sent: {address}");
+                    var millisecondsTimeout = new Random()
+                        .Next(_emailSenderConfiguration.MinDelay,
+                            _emailSenderConfiguration.MaxDelay);
+                    Thread.Sleep(millisecondsTimeout);
+                };
+            }
+        }
 
-            msg.From = new MailAddress(_emailSenderConfiguration.AddressFrom, _emailSenderConfiguration.AddressFromDisplayName);
-            msg.Subject = _emailSenderConfiguration.Subject;
-            msg.Body = _emailSenderConfiguration.Body;
-            msg.To.Add(_emailSenderConfiguration.AddressTo);
-            //msg.Priority = MailPriority.High;
+        private void Send(string address)
+        {
+            var msg = new MailMessage
+            {
+               From = new MailAddress(_emailSenderConfiguration.AddressFrom,
+                   _emailSenderConfiguration.AddressFromDisplayName),
+               Subject = _emailSenderConfiguration.Subject,
+               Body = _emailSenderConfiguration.Body,
+            };
 
-            using var client = new SmtpClient();
-            client.EnableSsl = _emailSenderConfiguration.EnableSsl;
-            client.UseDefaultCredentials = _emailSenderConfiguration.UseDefaultCredentials;
-            client.Credentials = new NetworkCredential(_emailSenderConfiguration.UserNameFrom, _emailSenderConfiguration.Password);
-            client.Host = _emailSenderConfiguration.Host;
-            client.Port = _emailSenderConfiguration.Port;
-            client.DeliveryMethod = SmtpDeliveryMethod.Network;
+            msg.To.Add(address);
+            msg.Attachments.Add(new Attachment(_emailSenderConfiguration.AttachmentFileName));
+
+            using var client = new SmtpClient
+            {
+                EnableSsl = _emailSenderConfiguration.EnableSsl,
+                UseDefaultCredentials = _emailSenderConfiguration.UseDefaultCredentials,
+                Credentials = new NetworkCredential(_emailSenderConfiguration.UserNameFrom, _emailSenderConfiguration.Password),
+                Host = _emailSenderConfiguration.Host,
+                Port = _emailSenderConfiguration.Port,
+                DeliveryMethod = SmtpDeliveryMethod.Network,
+            };
 
             client.Send(msg);
         }
